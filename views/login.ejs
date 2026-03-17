@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Sales Report — Login</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"/>
+  <style>
+    body { background:#2c3e50; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+    .login-box { background:#fff; border-radius:6px; padding:40px; width:360px; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
+    .login-box h2 { margin-top:0; color:#2c3e50; }
+    .btn-primary { background:#2c3e50; border-color:#2c3e50; width:100%; }
+    .btn-primary:hover { background:#34495e; border-color:#34495e; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>📊 Sales Report</h2>
+    <p style="color:#7f8c8d;font-size:13px">Sign in with your Admin Manager credentials</p>
+    <% if (error) { %>
+      <div class="alert alert-danger"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/login">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" class="form-control" autofocus required/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" class="form-control" required/>
+      </div>
+      <button type="submit" class="btn btn-primary">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sales Report</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css"/>
+  <style>
+    body { background:#f0f2f5; margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+    .topbar { background:#2c3e50; color:#fff; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar h1 { margin:0; font-size:20px; }
+    .topbar .user { font-size:13px; opacity:.8; }
+    .topbar a { color:#ecf0f1; font-size:13px; text-decoration:none; margin-left:16px; }
+    .container-main { padding:24px; }
+    .filter-card { background:#fff; border-radius:6px; padding:16px 20px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+    .summary-row { display:flex; gap:16px; margin-bottom:20px; }
+    .stat-card { flex:1; background:#fff; border-radius:6px; padding:16px 20px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+    .stat-card .num { font-size:32px; font-weight:700; color:#2c3e50; }
+    .stat-card .lbl { font-size:12px; color:#95a5a6; text-transform:uppercase; letter-spacing:.5px; }
+    .rep-block { background:#fff; border-radius:6px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,.1); overflow:hidden; }
+    .rep-head { background:#2c3e50; color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+    .rep-head h4 { margin:0; font-size:15px; }
+    .rep-meta span { margin-left:20px; font-size:13px; opacity:.85; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { background:#ecf0f1; padding:10px 14px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #ddd; }
+    tbody td { padding:9px 14px; border-bottom:1px solid #f0f0f0; }
+    tbody tr:hover { background:#fafafa; }
+    .badge-new { background:#27ae60; color:#fff; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+    .badge-existing { background:#bdc3c7; color:#fff; padding:2px 8px; border-radius:10px; font-size:11px; }
+    .amount { text-align:right; font-weight:500; color:#2c3e50; }
+    #loading { display:none; text-align:center; padding:40px; color:#7f8c8d; }
+    #error-msg { display:none; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><i class="fas fa-chart-bar"></i> Sales Report</h1>
+    <div>
+      <span class="user"><i class="fas fa-user"></i> <%= user.fullName %></span>
+      <a href="/logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+  </div>
+
+  <div class="container-main">
+    <!-- Filters -->
+    <div class="filter-card">
+      <form id="filterForm" style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">MONTH</label>
+          <select id="selMonth" class="form-control" style="width:130px">
+            <% ['January','February','March','April','May','June','July','August','September','October','November','December'].forEach((m,i) => { %>
+              <option value="<%= i+1 %>" <%= (i+1 === month) ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">YEAR</label>
+          <select id="selYear" class="form-control" style="width:90px">
+            <% for(let y=year; y>=year-3; y--) { %>
+              <option value="<%= y %>" <%= y===year?'selected':'' %>><%= y %></option>
+            <% } %>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">NEW BUSINESS ≤</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="nbMonths" class="form-control" value="6" min="1" max="60" style="width:70px"/>
+            <span style="color:#7f8c8d;font-size:13px">months</span>
+          </div>
+        </div>
+        <div>
+          <button type="button" id="btnLoad" class="btn btn-primary"><i class="fas fa-sync-alt"></i> Load</button>
+          <button type="button" id="btnExport" class="btn btn-success" style="margin-left:8px" disabled><i class="fas fa-file-csv"></i> CSV</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="error-msg" class="alert alert-danger"></div>
+    <div id="loading"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Loading...</div>
+
+    <!-- Summary -->
+    <div id="summaryRow" class="summary-row" style="display:none">
+      <div class="stat-card"><div class="num" id="sumReps">-</div><div class="lbl">Reps</div></div>
+      <div class="stat-card"><div class="num" id="sumAccounts">-</div><div class="lbl">Accounts</div></div>
+      <div class="stat-card"><div class="num" id="sumTotal">-</div><div class="lbl">Total Spend</div></div>
+      <div class="stat-card"><div class="num" id="sumNB">-</div><div class="lbl">New Business</div></div>
+    </div>
+
+    <div id="reportOutput"></div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+  <script>
+    var reportData = null;
+    var fmt = v => '$' + parseFloat(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function loadReport() {
+      $('#btnLoad').prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Loading...');
+      $('#loading').show(); $('#error-msg').hide(); $('#reportOutput').empty(); $('#summaryRow').hide(); $('#btnExport').prop('disabled',true);
+      $.ajax({
+        url: '/api/report?month='+$('#selMonth').val()+'&year='+$('#selYear').val()+'&newBusinessMonths='+$('#nbMonths').val(),
+        success: function(d) { reportData = d; render(d); },
+        error: function(x) { $('#error-msg').text('Error: '+(x.responseJSON&&x.responseJSON.error||x.statusText)).show(); },
+        complete: function() { $('#loading').hide(); $('#btnLoad').prop('disabled',false).html('<i class="fas fa-sync-alt"></i> Load'); }
+      });
+    }
+
+    function render(d) {
+      var reps = d.repSummaries;
+      var totAccounts = reps.reduce((s,r)=>s+r.accounts.length,0);
+      var totSpend = reps.reduce((s,r)=>s+r.totalSpend,0);
+      var totNB = reps.reduce((s,r)=>s+r.newBusinessSpend,0);
+      $('#sumReps').text(reps.length); $('#sumAccounts').text(totAccounts);
+      $('#sumTotal').text(fmt(totSpend)); $('#sumNB').text(fmt(totNB));
+      $('#summaryRow').show();
+
+      if (!reps.length) { $('#reportOutput').html('<div class="alert alert-info">No data for '+months[d.month-1]+' '+d.year+'.</div>'); return; }
+
+      var html = '';
+      reps.forEach(function(rep) {
+        var nbPct = rep.totalSpend > 0 ? (rep.newBusinessSpend/rep.totalSpend*100).toFixed(1) : '0.0';
+        html += '<div class="rep-block">';
+        html += '<div class="rep-head" onclick="$(this).next().toggle()">';
+        html += '<h4><i class="fas fa-user" style="margin-right:8px"></i>'+rep.staffName+'</h4>';
+        html += '<div class="rep-meta"><span>'+rep.accounts.length+' accounts</span><span>Total: <b>'+fmt(rep.totalSpend)+'</b></span><span>New Biz: <b>'+fmt(rep.newBusinessSpend)+'</b> ('+nbPct+'%)</span><span style="opacity:.5"><i class="fas fa-chevron-down"></i></span></div>';
+        html += '</div><div>';
+        html += '<table><thead><tr><th>Account</th><th>Date Joined</th><th>Months Active</th><th>Type</th><th class="amount">Monthly Spend</th></tr></thead><tbody>';
+        rep.accounts.forEach(function(a) {
+          html += '<tr><td>'+a.clientName+'</td><td>'+(a.dateJoined||'—')+'</td><td>'+a.monthsActive+'</td>';
+          html += '<td>'+(a.isNewBusiness?'<span class="badge-new">New Business</span>':'<span class="badge-existing">Existing</span>')+'</td>';
+          html += '<td class="amount">'+fmt(a.monthlySpend)+'</td></tr>';
+        });
+        html += '</tbody></table></div></div>';
+      });
+      $('#reportOutput').html(html);
+      $('#btnExport').prop('disabled',false);
+    }
+
+    function exportCSV() {
+      if (!reportData) return;
+      var rows = [['Rep','Account','Date Joined','Months Active','Type','Monthly Spend']];
+      reportData.repSummaries.forEach(function(r) {
+        r.accounts.forEach(function(a) {
+          rows.push([r.staffName,a.clientName,a.dateJoined||'',a.monthsActive,a.isNewBusiness?'New Business':'Existing',a.monthlySpend.toFixed(2)]);
+        });
+      });
+      var csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+      a.download = 'sales-'+reportData.year+'-'+String(reportData.month).padStart(2,'0')+'.csv'; a.click();
+    }
+
+    $('#btnLoad').click(loadReport);
+    $('#btnExport').click(exportCSV);
+    loadReport();
+  </script>
+</body>
+</html>
