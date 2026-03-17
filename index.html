@@ -89,14 +89,20 @@
   .progress-marker { position: absolute; right: 0; top: -2px; width: 2px; height: 8px; background: var(--ink-60); border-radius: 1px; }
 
   /* ── Chart ── */
-  .chart-box { background: var(--surface); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 20px; overflow: hidden; position: relative; }
+  .chart-box { background: var(--surface); border-radius: var(--radius); padding: 20px 22px 16px; margin-bottom: 20px; overflow: hidden; position: relative; width: 100%; }
   .chart-box h3 { font-size: 13px; font-weight: 600; color: var(--ink-60); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
   .chart-box h3.green { color: var(--green); }
-  .chart-bars { display: flex; align-items: flex-end; gap: 3px; height: 200px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
-  .chart-bar-wrap { flex: 1; min-width: 28px; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; overflow: hidden; }
-  .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; flex-shrink: 0; }
-  .chart-label { font-size: 9px; color: var(--ink-60); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
-  .chart-dual-wrap { display: flex; align-items: flex-end; gap: 2px; flex: 1; min-width: 36px; height: 100%; justify-content: flex-end; }
+  /* Chart */
+  .chart-area { display: flex; align-items: flex-end; justify-content: space-between; width: 100%; overflow: hidden; }
+  .chart-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1 1 0; min-width: 0; gap: 3px; padding: 0 2px; }
+  .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
+  .chart-val { font-size: 9px; color: var(--ink-60); font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+  .chart-pct { font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 100px; text-align: center; }
+  .chart-label { font-size: 9px; color: var(--ink-60); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block; margin-top: 2px; }
+  .chart-legend { display: flex; gap: 16px; margin-bottom: 12px; }
+  .chart-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-60); }
+  .chart-legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .dual-bars { display: flex; align-items: flex-end; gap: 2px; justify-content: center; width: 100%; }
   .mono { font-family: 'Inter', monospace; }
 
   /* ── Tables ── */
@@ -14713,7 +14719,7 @@ function buildBarChart(data, height, color) {
     const bh = Math.max((d.value/max)*(height-50), 2);
     const bg = d.isNew ? '#10b981' : (color||'#2563eb');
     h += `<div class="chart-col"><span class="chart-val">${fmtCur(d.value)}</span>`;
-    h += `<div class="chart-bar" style="width:${bw}px;height:${bh}px;background:${bg};opacity:0.85"></div>`;
+    h += `<div class="chart-bar" style="height:${bh}px;background:${bg};opacity:0.85"></div>`;
     h += `<span class="chart-label" style="${vert?'writing-mode:vertical-rl;text-orientation:mixed':''}">${d.label}</span></div>`;
   });
   return h + '</div>';
@@ -14734,11 +14740,11 @@ function buildDualChart(data, height) {
     const abh = Math.max((d.actual/max)*(height-60), 2);
     const bbh = d.budget > 0 ? Math.max((d.budget/max)*(height-60), 2) : 0;
     const acol = d.isNew ? '#10b981' : '#2563eb';
-    h += `<div class="chart-col" style="width:${gw}px">`;
+    h += `<div class="chart-col">`;
     if (pct !== null) h += `<span class="chart-pct ${pct>=0?'var-pos':'var-neg'}">${pct>=0?'+':''}${pct.toFixed(0)}%</span>`;
     h += `<span class="chart-val" style="font-size:9px">${fmtCur(d.actual)}</span>`;
-    h += `<div class="dual-bars"><div class="chart-bar" style="width:${bw}px;height:${abh}px;background:${acol};opacity:0.9"></div>`;
-    h += `<div class="dual-budget-bar" style="width:${bw}px;height:${bbh}px"></div></div>`;
+    h += `<div class="dual-bars"><div class="chart-bar" style="height:${abh}px;background:${acol};opacity:0.9;flex:1"></div>`;
+    h += `<div class="dual-budget-bar" style="height:${bbh}px;flex:1"></div></div>`;
     h += `<span class="chart-label" style="${vert?'writing-mode:vertical-rl;text-orientation:mixed':''}">${d.label}</span></div>`;
   });
   return h + '</div>';
@@ -15007,6 +15013,6 @@ initControls();
 render();
 </script>
 
-<div style="text-align:right;padding:8px 32px 16px;font-size:11px;color:#334155">Generated 18 Mar 2026 06:46 NZST · Auto-refreshes monthly</div>
+<div style="text-align:right;padding:8px 32px 16px;font-size:11px;color:#334155">Generated 18 Mar 2026 06:50 NZST · Auto-refreshes monthly</div>
 </body>
 </html>
