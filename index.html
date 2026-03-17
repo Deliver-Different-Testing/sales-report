@@ -93,8 +93,8 @@
   .chart-box h3 { font-size: 13px; font-weight: 600; color: var(--ink-60); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
   .chart-box h3.green { color: var(--green); }
   /* Chart */
-  .chart-area { display: flex; align-items: flex-end; justify-content: space-between; width: 100%; overflow: hidden; }
-  .chart-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1 1 0; min-width: 0; gap: 3px; padding: 0 2px; }
+  .chart-area { display: flex; flex-direction: row !important; align-items: flex-end; justify-content: space-between; width: 100%; overflow: hidden; min-height: 180px; }
+  .chart-col { display: flex; flex-direction: column !important; align-items: center; justify-content: flex-end; flex: 1 1 0; min-width: 0; max-width: none; gap: 3px; padding: 0 2px; }
   .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
   .chart-val { font-size: 9px; color: var(--ink-60); font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
   .chart-pct { font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 100px; text-align: center; }
