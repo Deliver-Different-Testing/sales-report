@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sales Data Admin</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:14px}
+    .topbar{background:#2c3e50;color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .topbar h1{font-size:18px;font-weight:600}
+    .topbar a{color:#ecf0f1;font-size:13px;text-decoration:none;margin-left:16px;opacity:.8}
+    .topbar a:hover{opacity:1}
+    .tabs{background:#fff;border-bottom:1px solid #e0e0e0;display:flex;padding:0 24px}
+    .tab{padding:14px 20px;cursor:pointer;font-weight:500;font-size:13px;color:#666;border-bottom:3px solid transparent;transition:.2s}
+    .tab.active{color:#2c3e50;border-bottom-color:#2c3e50}
+    .tab:hover:not(.active){color:#2c3e50;background:#f8f8f8}
+    .content{padding:20px 24px}
+    .toolbar{background:#fff;border-radius:8px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .toolbar input,.toolbar select{padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit}
+    .toolbar input{width:260px}
+    .btn{padding:7px 16px;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:.15s}
+    .btn-primary{background:#2c3e50;color:#fff}.btn-primary:hover{background:#1a252f}
+    .btn-success{background:#27ae60;color:#fff}.btn-success:hover{background:#219a52}
+    .btn-danger{background:#e74c3c;color:#fff}.btn-danger:hover{background:#c0392b}
+    .btn-sm{padding:4px 10px;font-size:12px}
+    .btn-outline{background:#fff;border:1px solid #ddd;color:#333}.btn-outline:hover{background:#f5f5f5}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+    .badge-active{background:#d5f5e3;color:#1e8449}
+    .badge-inactive{background:#fdecea;color:#c0392b}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    thead th{background:#f8f9fa;padding:10px 14px;text-align:left;font-weight:600;font-size:12px;color:#555;border-bottom:2px solid #e9ecef;white-space:nowrap}
+    thead th.sortable{cursor:pointer;user-select:none}.thead th.sortable:hover{background:#eee}
+    tbody td{padding:8px 14px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+    tbody tr:hover{background:#fafbfc}
+    tbody tr.editing{background:#fffde7}
+    .editable{cursor:pointer;padding:3px 6px;border-radius:4px;transition:.15s}
+    .editable:hover{background:#e8f4fd;outline:1px dashed #3498db}
+    .inline-edit{display:none}
+    .inline-edit input,.inline-edit select{padding:4px 8px;border:1px solid #3498db;border-radius:4px;font-size:13px;font-family:inherit;width:100%}
+    .save-row,.cancel-row{display:none}
+    .pagination{display:flex;align-items:center;gap:8px;margin-top:16px;justify-content:flex-end}
+    .pagination button{padding:5px 12px;border:1px solid #ddd;background:#fff;border-radius:5px;cursor:pointer;font-size:13px}
+    .pagination button:disabled{opacity:.4;cursor:default}
+    .pagination .page-info{font-size:13px;color:#666}
+    .toast{position:fixed;bottom:24px;right:24px;background:#2c3e50;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none;z-index:9999;max-width:340px}
+    .toast.success{background:#27ae60}.toast.error{background:#e74c3c}
+    .loading{text-align:center;padding:40px;color:#888}
+    .count-badge{background:#e8f4fd;color:#2980b9;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;margin-left:8px}
+    .changed-indicator{width:6px;height:6px;background:#f39c12;border-radius:50%;display:inline-block;margin-right:4px}
+    #bulk-actions{display:none;align-items:center;gap:8px;padding:8px 12px;background:#fff8e1;border:1px solid #f39c12;border-radius:6px;font-size:13px}
+    .col-check{width:36px}
+    .col-id{width:60px}
+    .rep-tag{display:inline-block;background:#eaf2fb;color:#2471a3;padding:2px 8px;border-radius:4px;font-size:12px}
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⚙️ Sales Data Admin</h1>
+  <div>
+    <span style="font-size:13px;opacity:.7">Logged in as <%= user.fullName %></span>
+    <a href="/">📊 Report</a>
+    <a href="/logout">Logout</a>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('accounts')">Accounts</div>
+  <div class="tab" onclick="switchTab('reps')">Sales Reps</div>
+</div>
+
+<div class="content">
+
+  <!-- ACCOUNTS TAB -->
+  <div id="tab-accounts">
+    <div class="toolbar">
+      <input type="text" id="search-accounts" placeholder="Search accounts…" oninput="debounceSearch()"/>
+      <select id="filter-rep" onchange="loadAccounts()">
+        <option value="">All Reps</option>
+      </select>
+      <select id="filter-active" onchange="loadAccounts()">
+        <option value="">All Status</option>
+        <option value="1">Active</option>
+        <option value="0">Inactive</option>
+      </select>
+      <span id="account-count" class="count-badge">–</span>
+      <div style="flex:1"></div>
+      <div id="bulk-actions">
+        <span id="bulk-count">0 selected</span>
+        <select id="bulk-rep" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">
+          <option value="">– Assign Rep –</option>
+        </select>
+        <button class="btn btn-success btn-sm" onclick="applyBulkRep()">Apply</button>
+        <button class="btn btn-outline btn-sm" onclick="clearSelection()">Cancel</button>
+      </div>
+      <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+
+    <table id="accounts-table">
+      <thead>
+        <tr>
+          <th class="col-check"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"/></th>
+          <th class="col-id">ID</th>
+          <th>Account Name</th>
+          <th>Sales Rep</th>
+          <th>Date Joined</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="accounts-body">
+        <tr><td colspan="7" class="loading">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <div class="pagination">
+      <button onclick="prevPage()" id="btn-prev">‹ Prev</button>
+      <span class="page-info" id="page-info">–</span>
+      <button onclick="nextPage()" id="btn-next">Next ›</button>
+    </div>
+  </div>
+
+  <!-- REPS TAB -->
+  <div id="tab-reps" style="display:none">
+    <div class="toolbar">
+      <input type="text" id="search-reps" placeholder="Search reps…" oninput="filterReps()"/>
+      <span id="rep-count" class="count-badge">–</span>
+    </div>
+
+    <table id="reps-table">
+      <thead>
+        <tr>
+          <th class="col-id">ID</th>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Start Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="reps-body">
+        <tr><td colspan="6" class="loading">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let staffList = [];
+let accountsData = { clients: [], total: 0, page: 1, pageSize: 100 };
+let currentPage = 1;
+let searchTimer = null;
+let selectedIds = new Set();
+
+// =================== INIT ===================
+async function init() {
+  staffList = await apiFetch('/api/admin/staff');
+  populateRepDropdowns();
+  await loadAccounts();
+}
+
+function populateRepDropdowns() {
+  const opts = staffList.map(s => `<option value="${s.id}">${s.firstName} ${s.lastName}</option>`).join('');
+  document.getElementById('filter-rep').innerHTML = '<option value="">All Reps</option>' + opts;
+  document.getElementById('bulk-rep').innerHTML = '<option value="">– Assign Rep –</option>' + opts;
+}
+
+// =================== ACCOUNTS ===================
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { currentPage = 1; loadAccounts(); }, 350);
+}
+
+async function loadAccounts() {
+  const search = document.getElementById('search-accounts').value;
+  const staffId = document.getElementById('filter-rep').value;
+  const active = document.getElementById('filter-active').value;
+  const params = new URLSearchParams({ page: currentPage, pageSize: 100 });
+  if (search) params.set('search', search);
+  if (staffId) params.set('staffId', staffId);
+  if (active !== '') params.set('active', active);
+
+  document.getElementById('accounts-body').innerHTML = '<tr><td colspan="7" class="loading">Loading…</td></tr>';
+  const data = await apiFetch('/api/admin/clients?' + params);
+  accountsData = data;
+  selectedIds.clear();
+  renderAccounts();
+}
+
+function renderAccounts() {
+  const { clients, total, page, pageSize } = accountsData;
+  document.getElementById('account-count').textContent = `${total.toLocaleString()} accounts`;
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  document.getElementById('page-info').textContent = `${start}–${end} of ${total}`;
+  document.getElementById('btn-prev').disabled = page <= 1;
+  document.getElementById('btn-next').disabled = end >= total;
+
+  const tbody = document.getElementById('accounts-body');
+  if (!clients.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#888">No accounts found</td></tr>'; return; }
+
+  tbody.innerHTML = clients.map(c => {
+    const repName = c.staffFirstName ? `${c.staffFirstName} ${c.staffLastName}` : '—';
+    const dateJoined = c.dateJoined ? c.dateJoined.slice(0, 10) : '';
+    return `
+    <tr id="row-${c.id}">
+      <td class="col-check"><input type="checkbox" onchange="toggleSelect(${c.id},this)" ${selectedIds.has(c.id)?'checked':''}></td>
+      <td class="col-id" style="color:#888;font-size:12px">${c.id}</td>
+      <td>
+        <span class="editable view-name-${c.id}" onclick="editCell('name',${c.id})">${escHtml(c.name)}</span>
+        <span class="inline-edit" id="edit-name-${c.id}"><input type="text" value="${escHtml(c.name)}" style="min-width:180px"/></span>
+      </td>
+      <td>
+        <span class="editable view-rep-${c.id}" onclick="editCell('rep',${c.id})">
+          ${c.staffId ? `<span class="rep-tag">${escHtml(repName)}</span>` : '<span style="color:#aaa">Unassigned</span>'}
+        </span>
+        <span class="inline-edit" id="edit-rep-${c.id}">
+          <select>
+            <option value="">– Unassigned –</option>
+            ${staffList.map(s => `<option value="${s.id}" ${c.staffId==s.id?'selected':''}>${s.firstName} ${s.lastName}</option>`).join('')}
+          </select>
+        </span>
+      </td>
+      <td>
+        <span class="editable view-date-${c.id}" onclick="editCell('date',${c.id})">${dateJoined || '<span style="color:#aaa">Not set</span>'}</span>
+        <span class="inline-edit" id="edit-date-${c.id}"><input type="date" value="${dateJoined}"/></span>
+      </td>
+      <td><span class="badge ${c.active?'badge-active':'badge-inactive'}">${c.active?'Active':'Inactive'}</span></td>
+      <td>
+        <button class="btn btn-success btn-sm save-row" id="save-${c.id}" onclick="saveRow(${c.id})">Save</button>
+        <button class="btn btn-outline btn-sm cancel-row" id="cancel-${c.id}" onclick="cancelRow(${c.id})">Cancel</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function editCell(type, id) {
+  const row = document.getElementById(`row-${id}`);
+  row.classList.add('editing');
+  // Show all inline edits for this row
+  row.querySelectorAll('.editable').forEach(el => el.style.display = 'none');
+  row.querySelectorAll('.inline-edit').forEach(el => el.style.display = 'inline-block');
+  document.getElementById(`save-${id}`).style.display = 'inline-block';
+  document.getElementById(`cancel-${id}`).style.display = 'inline-block';
+}
+
+function cancelRow(id) {
+  const row = document.getElementById(`row-${id}`);
+  row.classList.remove('editing');
+  row.querySelectorAll('.editable').forEach(el => el.style.display = '');
+  row.querySelectorAll('.inline-edit').forEach(el => el.style.display = 'none');
+  document.getElementById(`save-${id}`).style.display = 'none';
+  document.getElementById(`cancel-${id}`).style.display = 'none';
+}
+
+async function saveRow(id) {
+  const nameInput = document.querySelector(`#edit-name-${id} input`);
+  const repSelect = document.querySelector(`#edit-rep-${id} select`);
+  const dateInput = document.querySelector(`#edit-date-${id} input`);
+
+  const payload = {
+    name: nameInput.value.trim(),
+    staffId: repSelect.value || null,
+    dateJoined: dateInput.value || null
+  };
+
+  const res = await apiFetch(`/api/admin/clients/${id}`, 'PATCH', payload);
+  if (res.success) {
+    // Update local data
+    const c = accountsData.clients.find(x => x.id === id);
+    if (c) {
+      c.name = payload.name;
+      c.staffId = payload.staffId ? parseInt(payload.staffId) : null;
+      c.dateJoined = payload.dateJoined;
+      const s = staffList.find(x => x.id == payload.staffId);
+      c.staffFirstName = s ? s.firstName : null;
+      c.staffLastName = s ? s.lastName : null;
+    }
+    renderAccounts();
+    showToast('Saved ✓', 'success');
+  } else {
+    showToast('Error: ' + (res.error || 'Unknown'), 'error');
+  }
+}
+
+// Selection / bulk
+function toggleSelect(id, cb) {
+  if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(cb) {
+  accountsData.clients.forEach(c => {
+    selectedIds[cb.checked ? 'add' : 'delete'](c.id);
+    const box = document.querySelector(`#row-${c.id} input[type=checkbox]`);
+    if (box) box.checked = cb.checked;
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-actions');
+  bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
+  document.getElementById('bulk-count').textContent = `${selectedIds.size} selected`;
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('#accounts-body input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.getElementById('select-all').checked = false;
+  updateBulkBar();
+}
+
+async function applyBulkRep() {
+  const staffId = document.getElementById('bulk-rep').value;
+  if (!staffId) { showToast('Please select a rep', 'error'); return; }
+  if (!confirm(`Assign ${selectedIds.size} accounts to this rep?`)) return;
+
+  const updates = [...selectedIds].map(id => ({ id, staffId: parseInt(staffId) }));
+  const res = await apiFetch('/api/admin/clients/bulk', 'PATCH', { updates });
+  const failed = res.filter(r => !r.success).length;
+  showToast(`Updated ${res.length - failed} accounts${failed ? `, ${failed} failed` : ''} ✓`, failed ? 'error' : 'success');
+  clearSelection();
+  loadAccounts();
+}
+
+// Pagination
+function prevPage() { if (currentPage > 1) { currentPage--; loadAccounts(); } }
+function nextPage() { currentPage++; loadAccounts(); }
+
+// CSV Export
+function exportCSV() {
+  const rows = [['ID','Name','Rep','Date Joined','Active']];
+  accountsData.clients.forEach(c => {
+    const rep = c.staffFirstName ? `${c.staffFirstName} ${c.staffLastName}` : '';
+    rows.push([c.id, c.name, rep, c.dateJoined ? c.dateJoined.slice(0,10) : '', c.active ? 'Yes' : 'No']);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `accounts-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// =================== REPS ===================
+let allReps = [];
+
+async function loadReps() {
+  allReps = await apiFetch('/api/admin/staff');
+  document.getElementById('rep-count').textContent = `${allReps.length} reps`;
+  renderReps(allReps);
+}
+
+function filterReps() {
+  const q = document.getElementById('search-reps').value.toLowerCase();
+  renderReps(allReps.filter(r => `${r.firstName} ${r.lastName}`.toLowerCase().includes(q)));
+}
+
+function renderReps(reps) {
+  const tbody = document.getElementById('reps-body');
+  if (!reps.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#888">No reps found</td></tr>'; return; }
+  tbody.innerHTML = reps.map(r => {
+    const startDate = r.startDate ? r.startDate.slice(0, 10) : '';
+    return `
+    <tr id="rep-row-${r.id}">
+      <td class="col-id" style="color:#888;font-size:12px">${r.id}</td>
+      <td>
+        <span class="editable" onclick="editRepCell(${r.id})">${escHtml(r.firstName)}</span>
+        <span class="inline-edit" id="rep-edit-fn-${r.id}"><input type="text" value="${escHtml(r.firstName)}"/></span>
+      </td>
+      <td>
+        <span class="editable" onclick="editRepCell(${r.id})">${escHtml(r.lastName)}</span>
+        <span class="inline-edit" id="rep-edit-ln-${r.id}"><input type="text" value="${escHtml(r.lastName)}"/></span>
+      </td>
+      <td>
+        <span class="editable" onclick="editRepCell(${r.id})">${startDate || '<span style="color:#aaa">Not set</span>'}</span>
+        <span class="inline-edit" id="rep-edit-sd-${r.id}"><input type="date" value="${startDate}"/></span>
+      </td>
+      <td><span class="badge ${r.active?'badge-active':'badge-inactive'}">${r.active?'Active':'Inactive'}</span></td>
+      <td>
+        <button class="btn btn-success btn-sm save-row" id="rep-save-${r.id}" onclick="saveRep(${r.id})" style="display:none">Save</button>
+        <button class="btn btn-outline btn-sm cancel-row" id="rep-cancel-${r.id}" onclick="cancelRep(${r.id})" style="display:none">Cancel</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function editRepCell(id) {
+  const row = document.getElementById(`rep-row-${id}`);
+  row.classList.add('editing');
+  row.querySelectorAll('.editable').forEach(el => el.style.display = 'none');
+  row.querySelectorAll('.inline-edit').forEach(el => el.style.display = 'inline-block');
+  document.getElementById(`rep-save-${id}`).style.display = 'inline-block';
+  document.getElementById(`rep-cancel-${id}`).style.display = 'inline-block';
+}
+
+function cancelRep(id) {
+  const row = document.getElementById(`rep-row-${id}`);
+  row.classList.remove('editing');
+  row.querySelectorAll('.editable').forEach(el => el.style.display = '');
+  row.querySelectorAll('.inline-edit').forEach(el => el.style.display = 'none');
+  document.getElementById(`rep-save-${id}`).style.display = 'none';
+  document.getElementById(`rep-cancel-${id}`).style.display = 'none';
+}
+
+async function saveRep(id) {
+  const payload = {
+    firstName: document.querySelector(`#rep-edit-fn-${id} input`).value.trim(),
+    lastName: document.querySelector(`#rep-edit-ln-${id} input`).value.trim(),
+    startDate: document.querySelector(`#rep-edit-sd-${id} input`).value || null
+  };
+  const res = await apiFetch(`/api/admin/staff/${id}`, 'PATCH', payload);
+  if (res.success) {
+    const r = allReps.find(x => x.id === id);
+    if (r) { r.firstName = payload.firstName; r.lastName = payload.lastName; r.startDate = payload.startDate; }
+    staffList = allReps; // keep in sync
+    renderReps(allReps);
+    populateRepDropdowns();
+    showToast('Saved ✓', 'success');
+  } else {
+    showToast('Error: ' + (res.error || 'Unknown'), 'error');
+  }
+}
+
+// =================== TABS ===================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['accounts','reps'][i] === tab));
+  document.getElementById('tab-accounts').style.display = tab === 'accounts' ? '' : 'none';
+  document.getElementById('tab-reps').style.display = tab === 'reps' ? '' : 'none';
+  if (tab === 'reps' && !allReps.length) loadReps();
+}
+
+// =================== UTILS ===================
+async function apiFetch(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  return res.json();
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type}`;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>
