@@ -204,7 +204,7 @@
       <h1 style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);letter-spacing:1px;text-transform:uppercase;margin:0">Sales Reporting</h1>
     </div>
     <div class="header-actions">
-      <button class="btn-budget" onclick="toggleBudgetModal()">&#8862; Set Budgets</button>
+      <button class="btn-budget" onclick="toggleBudgetModal()">&#8862; Set Budgets</button><button class="btn-budget" onclick="toggleManageModal()" style="margin-left:8px">&#8597; Manage Data</button>
       <div class="tab-group" id="mainTabs"></div>
     </div>
   </div>
@@ -15011,8 +15011,223 @@ function updateBudgetVal(rep, type, month, val) {
 // ============= INIT =============
 initControls();
 render();
+
+// ============= MANAGE DATA =============
+function toggleManageModal() {
+  const m = document.getElementById('manage-modal');
+  m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function switchManageTab(tab) {
+  ['download','upload'].forEach(t => {
+    document.getElementById('mtab-' + t).style.color = t === tab ? '#2c3e50' : '#888';
+    document.getElementById('mtab-' + t).style.borderBottomColor = t === tab ? '#2c3e50' : 'transparent';
+    document.getElementById('mtab-' + t).style.fontWeight = t === tab ? '600' : '500';
+    document.getElementById('mpanel-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+}
+
+function updateUploadHint() {}
+
+function downloadCSV(type) {
+  let rows, filename;
+  if (type === 'accounts') {
+    rows = [['id','name','rep','repName','firstTradeDate','sector','monthlyRevenue']];
+    ACCOUNTS.forEach(a => rows.push([a.id, a.name, a.rep, a.repName, a.firstTradeDate || '', a.sector || '', a.monthlyRevenue || '']));
+    filename = 'accounts.csv';
+  } else {
+    rows = [['id','name']];
+    REPS.filter(r => r.id !== 'all').forEach(r => rows.push([r.id, r.name]));
+    filename = 'reps.csv';
+  }
+  const csv = rows.map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = filename;
+  a.click();
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+  return lines.slice(1).map(line => {
+    const vals = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { vals.push(cur); cur = ''; }
+      else { cur += c; }
+    }
+    vals.push(cur);
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (vals[i] || '').replace(/^"|"$/g,'').trim());
+    return obj;
+  });
+}
+
+function previewCSV() {
+  const file = document.getElementById('csv-file').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows = parseCSV(e.target.result);
+    const preview = document.getElementById('csv-preview');
+    preview.style.display = 'block';
+    preview.innerHTML = '<strong>' + rows.length + ' rows detected</strong><br/>' +
+      'Columns: ' + Object.keys(rows[0] || {}).join(', ');
+  };
+  reader.readAsText(file);
+}
+
+async function pushCSV() {
+  const token = document.getElementById('gh-token').value.trim();
+  const file = document.getElementById('csv-file').files[0];
+  const type = document.getElementById('upload-type').value;
+
+  if (!token) return setUploadStatus('Please enter your GitHub token.', 'error');
+  if (!file) return setUploadStatus('Please select a CSV file.', 'error');
+
+  setUploadStatus('Reading file…', 'info');
+  document.getElementById('btn-push').disabled = true;
+
+  const text = await file.text();
+  const rows = parseCSV(text);
+  if (!rows.length) return setUploadStatus('No data rows found in CSV.', 'error');
+
+  setUploadStatus('Fetching current page from GitHub…', 'info');
+
+  try {
+    const apiBase = 'https://api.github.com/repos/Deliver-Different-Testing/sales-report';
+    const headers = { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' };
+
+    const fileRes = await fetch(apiBase + '/contents/index.html?ref=gh-pages', { headers });
+    const fileMeta = await fileRes.json();
+    if (!fileMeta.content) return setUploadStatus('Could not fetch index.html: ' + (fileMeta.message || 'Unknown error'), 'error');
+
+    let html = atob(fileMeta.content.replace(/\n/g, ''));
+
+    if (type === 'accounts') {
+      // Update ACCOUNTS — preserve all fields, only update editable ones by id
+      const updateMap = {};
+      rows.forEach(r => { if (r.id) updateMap[String(r.id)] = r; });
+
+      const newAccounts = ACCOUNTS.map(a => {
+        const u = updateMap[String(a.id)];
+        if (!u) return a;
+        return {
+          ...a,
+          name: u.name || a.name,
+          rep: u.rep || a.rep,
+          repName: u.repName || a.repName,
+          firstTradeDate: u.firstTradeDate || a.firstTradeDate,
+          sector: u.sector !== undefined ? u.sector : a.sector
+        };
+      });
+
+      const newJson = JSON.stringify(newAccounts, null, 2);
+      html = html.replace(/const ACCOUNTS = \[.*?\];/s, 'const ACCOUNTS = ' + newJson + ';');
+
+    } else if (type === 'reps') {
+      const newReps = [{ id: 'all', name: 'All Reps' }, ...rows.map(r => ({ id: r.id, name: r.name }))];
+      const newJson = JSON.stringify(newReps, null, 2);
+      html = html.replace(/const REPS = \[.*?\];/s, 'const REPS = ' + newJson + ';');
+    }
+
+    setUploadStatus('Pushing to GitHub…', 'info');
+
+    const pushRes = await fetch(apiBase + '/contents/index.html', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        message: 'Update ' + type + ' data via Manage Data tool',
+        content: btoa(unescape(encodeURIComponent(html))),
+        sha: fileMeta.sha,
+        branch: 'gh-pages'
+      })
+    });
+
+    const pushData = await pushRes.json();
+    if (pushData.content) {
+      setUploadStatus('✅ Published! The report will refresh in ~30 seconds. Reload the page to see changes.', 'success');
+      document.getElementById('csv-file').value = '';
+      document.getElementById('csv-preview').style.display = 'none';
+    } else {
+      setUploadStatus('Push failed: ' + (pushData.message || JSON.stringify(pushData)), 'error');
+    }
+  } catch (e) {
+    setUploadStatus('Error: ' + e.message, 'error');
+  }
+
+  document.getElementById('btn-push').disabled = false;
+}
+
+function setUploadStatus(msg, type) {
+  const el = document.getElementById('upload-status');
+  el.style.display = 'block';
+  el.style.background = type === 'success' ? '#d5f5e3' : type === 'error' ? '#fdecea' : '#eaf4fd';
+  el.style.color = type === 'success' ? '#1e8449' : type === 'error' ? '#c0392b' : '#2471a3';
+  el.textContent = msg;
+}
+
 </script>
 
 <div style="text-align:right;padding:8px 32px 16px;font-size:11px;color:#334155">Generated 18 Mar 2026 06:55 NZST · Auto-refreshes monthly</div>
+
+<!-- Manage Data Modal -->
+<div id="manage-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:20px 24px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0;font-size:17px;color:#1a1a2e">⚙️ Manage Data</h3>
+      <button onclick="toggleManageModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1">&times;</button>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;border-bottom:1px solid #eee">
+      <div id="mtab-download" onclick="switchManageTab('download')" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#2c3e50;border-bottom:3px solid #2c3e50">⬇ Download</div>
+      <div id="mtab-upload" onclick="switchManageTab('upload')" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#888;border-bottom:3px solid transparent">⬆ Upload</div>
+    </div>
+
+    <!-- Download Tab -->
+    <div id="mpanel-download" style="padding:24px">
+      <p style="font-size:13px;color:#555;margin-bottom:16px">Download the current account data as a CSV file. Edit it in Excel or Google Sheets, then use the Upload tab to push your changes back.</p>
+      <div style="background:#f8f9fa;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#666">
+        <strong>Editable columns:</strong> Account Name, Rep ID, Rep Name, First Trade Date, Sector
+      </div>
+      <button onclick="downloadCSV('accounts')" style="background:#2c3e50;color:#fff;border:none;padding:10px 20px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;margin-right:8px">⬇ Download Accounts CSV</button>
+      <button onclick="downloadCSV('reps')" style="background:#fff;color:#2c3e50;border:1px solid #2c3e50;padding:10px 20px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">⬇ Download Reps CSV</button>
+    </div>
+
+    <!-- Upload Tab -->
+    <div id="mpanel-upload" style="padding:24px;display:none">
+      <p style="font-size:13px;color:#555;margin-bottom:16px">Upload your edited CSV to update the live report. Changes are pushed directly to GitHub and the report refreshes automatically.</p>
+
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:6px">UPLOAD TYPE</label>
+        <select id="upload-type" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:100%" onchange="updateUploadHint()">
+          <option value="accounts">Accounts</option>
+          <option value="reps">Reps</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:6px">CSV FILE</label>
+        <input type="file" id="csv-file" accept=".csv" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px" onchange="previewCSV()"/>
+      </div>
+
+      <div id="csv-preview" style="display:none;margin-bottom:16px;background:#f8f9fa;border-radius:8px;padding:12px;font-size:12px;color:#555;max-height:120px;overflow-y:auto;font-family:monospace"></div>
+
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:6px">GITHUB TOKEN <span style="font-weight:400;color:#888">(Personal Access Token with repo write access)</span></label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:monospace"/>
+        <div style="font-size:11px;color:#999;margin-top:4px">🔒 Token is used only for this upload and never stored.</div>
+      </div>
+
+      <div id="upload-status" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px"></div>
+
+      <button onclick="pushCSV()" id="btn-push" style="background:#27ae60;color:#fff;border:none;padding:10px 24px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;width:100%">⬆ Upload &amp; Publish</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
